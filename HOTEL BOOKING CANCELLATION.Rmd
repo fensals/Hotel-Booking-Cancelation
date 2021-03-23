@@ -1,0 +1,468 @@
+---
+title: "HOTEL BOOKING CANCELLATION"
+author: "Fensals"
+date: "3/15/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing Necessary Libraries
+
+```{r}
+library(readxl) # to read excel  files
+library(tidyverse) # A collection of packages - makes it easy to  load core packages in a single command.
+library(zoo) # for time series and ordered observations
+library(caret) ## package for model training(Regression and classifications)
+library(lattice) #Graphics and visualizations
+library(Metrics) #Evaluation metrics for Machine learning
+library(kableExtra) #package for Creating complex tables
+library(ggplot2)# package for creating charts/visualizations
+library(ggpubr)# package for creating charts/visualizations
+library(randomForest) #Random forest Machine Learning Algorithm
+library(e1071) #Functions for latent class analysis
+library(Boruta) #For relevant feature selection
+library(tree) # Decision Tree Algorithm For Classification and Regression
+library(rpart) #Recursive Partitioning and Tree Algorithm for classification and Regression
+library(rattle) #GUI for better tree plots
+library(rpart.plot)#Tree plots
+library(RColorBrewer)#Color palettes
+library(caTools)#collection of basic utility functions
+library(party) #A computational toolbox for recursive partitioning.
+library(janitor)##for creating frequency tables
+library(vtree)# Tree -like visualizations
+
+```
+
+#Importing the datasets
+```{r}
+hotel1 <- read_csv("H1.csv")
+hotel2 <- read_csv("H2.csv")
+```
+
+#Checking the column names and structure of both datasets to confirm that they can be joined.
+```{r}
+names(hotel1)
+str(hotel1)
+dim(hotel1)
+
+```
+
+
+```{r}
+names(hotel2)
+str(hotel2)
+dim(hotel2)
+```
+
+#The data sets have the same number of columns and column names, they can therefore be joined along the row.
+
+```{r}
+#Using r-bind to join "hotel1" and "hotel2" and giving it a new variable name "hotel"
+
+hotel <- rbind(hotel1, hotel2)
+```
+
+#Confirming the data types of the variables based on documentation provided
+```{r}
+str(hotel)
+```
+#Some variables are appearing as character when they should be categorical.
+
+```{r}
+#Converting the variables with wrong data types into the correct data type
+hotel$IsCanceled <- as.factor(hotel$IsCanceled)
+hotel$DepositType <- as.factor(hotel$DepositType)
+hotel$Meal <- as.factor(hotel$Meal)
+hotel$Country <- as.factor(hotel$Country)
+hotel$MarketSegment <- as.factor(hotel$MarketSegment)
+hotel$DistributionChannel <- as.factor(hotel$DistributionChannel)
+hotel$ReservedRoomType <- as.factor(hotel$ReservedRoomType)
+hotel$AssignedRoomType <- as.factor(hotel$AssignedRoomType)
+hotel$DepositType <-  as.factor(hotel$DepositType)
+hotel$Agent <- as.factor(hotel$Agent)
+hotel$Company <- as.factor(hotel$Company)
+hotel$CustomerType <- as.factor(hotel$CustomerType)
+hotel$ReservationStatus <- as.factor(hotel$ReservationStatus)
+
+#Checking to confirm that changes have been effected
+str(hotel)
+```
+
+#Checking for missing values
+```{r}
+sum(is.na(hotel))
+```
+
+There are 4 missing values in the data set in general. 
+
+checking to confirm which columns have missing values
+```{r}
+names(which(colSums(is.na(hotel)) > 0))
+```
+Missing values are only found in the 'children' column.
+```{r}
+#Dealing with the missing values by replacing them with the median.
+
+hotel$Children[is.na(hotel$Children)] <- median(hotel$Children, na.rm=TRUE)
+
+#Confirming that missing values have been dealt with
+sum(is.na(hotel))
+```
+
+
+```{r}
+head(hotel)
+```
+
+
+
+############################################### EXPLORATORY DATA ANALYSIS ######################################################################
+
+
+1. Which country has the most number of hotel bookings/ expected visitors?
+2. Which year has the most number of bookings?
+3. Which month has the highest number of bookings?
+4. Which month has the highest number of cancellations?
+5. How many bookings were canceled?
+6. Which customer type contributes to the most hotel booking cancellations?.
+7. Which deposit type resulted in the most cancellations?
+8. What is the average daily rate each year?
+
+
+
+
+#### 1. WHICH COUNTRY HAS THE MOST NUMBER OF HOTEL BOOKINGS/EXPECTED VISITOR? 
+
+```{r}
+country_table = table(hotel$Country) #Creating a  frequency table for the country column
+country_df = data.frame(country_table) #Putting it into a dataframe
+head(country_df)
+names(country_df)[1] = 'Country' #Replacing the default column name(Var1) in the dataframe with 'Country'
+country_df_new <- country_df[order(country_df$Freq),] #ordering the data frame by frequency in ascending order (default order)
+countries_top <- tail(country_df_new, n = 7) # creating a dataframe with the  7 countries that have the highest frequencies 
+dim(country_df_new) #To confirm total number of countries
+sum(countries_top$Freq) #to confirm the number of bookings from the top 7 countries
+```
+
+#Visualization for countries with the most bookings.
+```{r}
+ggplot(countries_top, aes(x = Country, y = Freq)) +
+geom_bar(fill = "#0073C2FF", stat = "identity") +
+geom_text(aes(label = Freq), vjust = -0.3) +
+theme_pubclean()
+```
+
+The graph above shows that PRT(Portugal), with 48,590 is the country with the most bookings, followed by GBR(Great Britain) with 12129 Bookings and FRA(france) with 10415 bookings. Other countries in the top 7 include ESP(spain), DEU(Germany), ITA(Italy) and IRE(Ireland).
+
+These 7 countries (All in europe) account for 94,130 bookings, which is about 79% of the total bookings.
+
+This shows that Europe is the continent where majority of the bookings originated. 
+
+
+
+
+###################### 2.WHICH YEAR HAS THE MOST NUMBER OF BOOKINGS?
+
+```{r}
+barplot(table(hotel$ArrivalDateYear), main = "Year of Arrival Date", col = c("red","blue","black"))
+```
+
+From the bar plot above, 2016 is the year with the most bookings. followed by 2017.
+
+The least bookings were made in 2015.  Possibly because data was not collected for the whole year in 2015 as it appears as though the data is for bookings made  starting from July, 2015.
+
+
+
+########################## 3 & 4. WHICH MONTH HAD THE HIGHEST NUMBER OF BBOKINGS AND CANCELLATIONS
+
+
+```{r}
+barplot(table(hotel$ArrivalDateMonth), main = "Bookings by Month", las=2 , col = c("blue","green","orange", "black", "pink", "red"))
+```
+
+
+```{r}
+hotel%>%
+ggplot(aes(x=ArrivalDateMonth,fill=IsCanceled))+
+geom_bar()
+```
+The Plots above show that July and August are the months with the most bookings, while december and january are the months with the least booking. This may be an indication that bookings are more in the summer and very low during winter.
+
+```{r}
+tabyl(hotel, IsCanceled, ArrivalDateMonth )%>%
+adorn_percentages("col") %>%
+adorn_pct_formatting(digits = 1)
+```
+
+
+################################# 5. HOW MANY BOOKINGS WERE CANCELED? 
+
+```{r}
+IsCanceled_tab <- (tabyl(hotel,IsCanceled)%>%
+adorn_pct_formatting(digits = 1)) #Creating a frequency table for IsCanceled column and their percentages
+
+IsCanceled_tab
+```
+
+
+```{r}
+vtree(hotel, "IsCanceled")
+```
+The table and graph above shows that 44,224 bookings were canceled, which accounts for about 37% of the total booking made.
+
+
+
+############################  6. WHICH CUSTOMER TYPE CONTRIBUTES THE MOST TO BOOKING CANCELATIONS ?
+
+```{r}
+hotel%>%
+ggplot(aes(x=CustomerType,fill=IsCanceled))+
+geom_bar()
+```
+
+
+```{r}
+tabyl(hotel, IsCanceled, CustomerType)
+```
+Majority of the bookings and cancellations were from the Transient customer type.
+
+
+
+
+###################### RELATIONSHIP BETWEEN BOOKING TYPE AND BOOKING CANCELATION?
+
+```{r}
+tabyl(hotel, IsCanceled, DepositType)%>%
+adorn_percentages("col") %>%
+adorn_pct_formatting(digits = 1)
+```
+
+
+```{r}
+hotel%>%
+ggplot(aes(x=DepositType,fill=IsCanceled))+
+geom_bar()
+```
+
+The graph above shows that majority of the bookings were done with no deposits which may be an indication that customers actually prefer to make payments at check in. Also, over 99 % of bookings with no refund policy on bookings were canceled but much lesser percentage of bookings were canceled with refundable deposits or no deposits at all.
+
+
+
+
+#### WHAT IS THE AVERAGE DAILY RATE PER YEAR?
+
+
+```{r}
+tapply(hotel$ADR, hotel$ArrivalDateYear, summary)
+```
+The mean Average Daily Rate(ADR) was 87.18 Units in 2015, 98.33 Units in 2016 and 114.64 Units in 2017 which shows a yearly increase in the Average daily rate for the hotel bookings.
+
+
+```{r}
+```
+
+
+
+
+##################################################### MACHINE LEARNING #########################################
+
+
+######################### SPLITTING INTO TRAINING AND TEST DATA ###############################################
+
+```{r}
+
+#Dropping unwanted columns in the dataset
+
+hotel <- subset(hotel, select = -c(Agent, Company, ReservationStatusDate, ReservationStatus, Country ))
+
+# Too many null values in the Agent and Company columns, they also have very limited bearing on the booking status
+
+#Reservation Status mirrors the target variable and may create a bias in the training as this variable can perfectly predict the target variable.
+
+# The country column has over 170 categories, too many categories for the algorithms.
+```
+
+
+```{r}
+# Sharing the dataset based on the categories in the target variable. This is to ensure there is no bias in the model training as a result of being exposed to a dataset with a disproportionate percentage of each category.
+
+data1 <-hotel[which(hotel$IsCanceled==0),]
+data2 <-hotel[which(hotel$IsCanceled==1),]
+```
+
+
+```{r}
+#Sharing the data splits into training and Test datasets
+set.seed(123)
+training1 <- sample(1:nrow(data1),0.80*nrow(data1)) #80% of bookings not canceled
+training2 <-sample(1:nrow(data2),0.80*nrow(data2)) #80% of booking canceled
+training_1 <- data1[training1,]
+training_2 <- data2[training2,]
+View(training_1)
+View(training_2)
+```
+
+
+```{r}
+#Combining both datasets to form the training data
+trainingdata <- rbind(training_1,training_2)
+
+#Creating the test data with the 20% remaining
+test_1 <- data1[-training1,]#contains 20% of those not canceled
+test_2 <- data2[-training2,]#contains 20% of those canceled
+testdata <- rbind(test_1,test_2)
+
+```
+
+
+
+####################################### RANDOM FOREST MACHINE LEARNING MODEL ###################################################
+
+
+```{r}
+#Creating a random forest model for feature importance
+
+model <- randomForest(IsCanceled~.,data = trainingdata)
+
+summary(model)
+```
+```{r}
+varImpPlot(model, col="blue")
+```
+```{r}
+model
+```
+
+
+```{r}
+
+model2 <- randomForest(IsCanceled~.,data=trainingdata, ntree=1000, mtry=3,importance=TRUE)
+model2
+
+```
+
+```{r}
+RFpred <- predict(model2,trainingdata,type="class")
+RFpred
+
+```
+
+```{r}
+table(RFpred,trainingdata$IsCanceled)
+mean(RFpred == trainingdata$IsCanceled)
+```
+
+```{r}
+randomForest::importance(model) #Saving the feature importance as Imp_Features
+
+```
+
+
+################################################## LOGISTIC REGRESSION ##############################################
+`
+```{r}
+ #Training the Model
+
+logisticmodel <-glm(IsCanceled ~ LeadTime + DepositType +   CustomerType + ADR +ArrivalDateDayOfMonth + MarketSegment + ArrivalDateWeekNumber + StaysInWeekNights + AssignedRoomType + ArrivalDateMonth + StaysInWeekendNights + BookingChanges + ReservedRoomType + Meal + Adults + DistributionChannel + Children +PreviousBookingsNotCanceled + DaysInWaitingList + IsRepeatedGuest + Babies, data = trainingdata, family = binomial(link = "logit"), maxit = 100)
+
+
+
+#TotalOfSpecialRequests #PreviousCancellations #RequiredCarParkingSpaces #ArrivalDateYear
+
+```
+
+
+```{r}
+summary(logisticmodel)
+
+```
+
+
+predict and add to the data
+```{r}
+testdata$predict<- predict(logisticmodel,testdata) #Applying the logistics Model to predict booking cancellation using the test data and adding it to the data set in a new column -"Predict"
+
+testdata$Class <- ifelse(testdata$predict>0, "1", "0") #assigning level "0" for not canceled and "1" for canceled booking to a new column -"Class" in the test data.
+
+View(testdata)
+
+testdata$Class <- as.factor(testdata$Class) #Converting the class variable from character into a categorical variable
+
+confusionMatrix(testdata$Class, testdata$IsCanceled) #Using a confusion matrix to examine the accuracy of the model.
+```
+
+#With an accuracy of 76.12 %, The model can be accepted.
+
+
+######################## DECISION TREE MODEL ###################################################
+
+
+```{r}
+tree_model <- rpart(IsCanceled~.,data = trainingdata)
+
+summary(tree_model)
+
+```
+
+
+```{r}
+fancyRpartPlot(tree_model)
+```
+
+
+```{r}
+printcp(tree_model)
+```
+
+```{r}
+tree_pred = predict(tree_model,testdata,type = "class")
+```
+
+
+```{r}
+confusionMatrix(tree_pred, testdata$IsCanceled)
+```
+
+The the accuracy of the decision tree model is 80.79%
+
+
+
+Based on the Models created and their accuracies:
+
+Logistic Regression has an accuracy of 76.12 %
+
+Decision Tree has an accuracy of 80.79%
+
+Random Forest has an accuracy of 86.63%
+
+Based on the results above, The candidate model is the Random Forest Model.
+
+```{r}
+memory.limit(20000)
+```
+
+
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
