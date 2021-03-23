@@ -1,0 +1,22 @@
+
+library(readxl) # to read excel  files
+library(tidyverse) # A collection of packages - makes it easy to  load core packages in a single command.
+library(zoo) # for time series and ordered observations
+library(caret) ## package for model training(Regression and classifications)
+library(lattice) #Graphics and visualizations
+library(Metrics) #Evaluation metrics for Machine learning
+library(kableExtra) #package for Creating complex tables
+library(ggplot2)# package for creating charts/visualizations
+library(ggpubr)# package for creating charts/visualizations
+library(randomForest) #Random forest Machine Learning Algorithm
+library(e1071) #Functions for latent class analysis
+library(Boruta) #For relevant feature selection
+library(tree) # Decision Tree Algorithm For Classification and Regression
+library(rpart) #Recursive Partitioning and Tree Algorithm for classification and Regression
+library(rattle) #GUI for better tree plots
+library(rpart.plot)#Tree plots
+library(RColorBrewer)#Color palettes
+library(caTools)#collection of basic utility functions
+library(party) #A computational toolbox for recursive partitioning.
+library(janitor)##for creating frequency tables
+library(vtree)# Tree -like visualizations
